@@ -126,7 +126,7 @@ func getTransferByTXID(txid string) rpc.Get_Transfer_By_TXID_Result {
 	if transfer.Entry.Time.String() == "" {
 		log.Infof("Time is \"\" string")
 	}
-	fmt.Printf("%s", transfer)
+
 	return transfer
 }
 
