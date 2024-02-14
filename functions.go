@@ -126,7 +126,7 @@ func getTransferByTXID(txid string) rpc.Get_Transfer_By_TXID_Result {
 	if transfer.Entry.Time.String() == "" {
 		log.Infof("Time is \"\" string")
 	}
-
+	fmt.Printf("%s", transfer)
 	return transfer
 }
 
@@ -139,18 +139,19 @@ func getBalance() (rpc.GetBalance_Result, error) {
 	return balance, nil
 }
 
-func sendTransfer(params rpc.Transfer_Params) rpc.Transfer_Result {
+func sendTransfer(params rpc.Transfer_Params) (rpc.Transfer_Result, error) {
 	var transfers rpc.Transfer_Result
-	_ = deroRpcClient.CallFor(
+	err = deroRpcClient.CallFor(
 		&transfers,
 		"Transfer",
 		params,
 	)
 
-	if transfers.TXID == "" {
-		log.Infof("TXID is \"\" string")
+	if err != nil {
+		return transfers, err
 	}
-	return transfers
+
+	return transfers, nil
 }
 
 func getIncomingTransfers() (rpc.Get_Transfers_Result, error) {
@@ -198,7 +199,7 @@ func truncateAddress(addr string, prefixLen, suffixLen int) string {
 	if len(addr) <= prefixLen+suffixLen {
 		return addr
 	}
-	return fmt.Sprintf("A: %s....%s", addr[:prefixLen], addr[len(addr)-suffixLen:])
+	return fmt.Sprintf("%s....%s", addr[:prefixLen], addr[len(addr)-suffixLen:])
 }
 
 func truncateTXID(txid string, prefixLen, suffixLen int) string {
@@ -242,7 +243,7 @@ func updateWallet(lblAddress *widget.Label) {
 	truncatedAddr := truncateAddress(addr.String(), 4, 2)
 	lblAddress.Text = truncatedAddr
 
-	lblAddress.SetText(truncatedAddr)
+	lblAddress.SetText("A: " + truncatedAddr)
 
 }
 
@@ -266,7 +267,7 @@ func updateBalance(lblBalance *widget.Label) {
 
 // Function to split a string into chunks of a specified size
 func chunkString(s string, chunkSize int) []string {
-	var chunks []string
+
 	for i := 0; i < len(s); i += chunkSize {
 		end := i + chunkSize
 		if end > len(s) {
@@ -277,31 +278,42 @@ func chunkString(s string, chunkSize int) []string {
 	return chunks
 }
 
-func processEntry(text string) rpc.Transfer_Result {
-
-	const maxChunkSize = 100
+func processEntry(text string) (rpc.Transfer_Result, error) {
 
 	// Check if the entry exceeds the character limit
-	if len(text) <= maxChunkSize {
+	if len(text) <= CHUNKSIZE {
 		// If the entry is within the character limit, proceed as before
 		return processSingleEntry(text)
 	}
 
-	// Send the transfers
-	return sendTransfer(
-		prepareParams(
-			prepareTransfers(
-				chunkString(
-					text,
-					maxChunkSize,
-				),
-			),
-		),
+	chunks := chunkString(text, CHUNKSIZE)
+	// Create a list to store transfers
+	var txs []rpc.Transfer
+
+	// Iterate over the chunks and create a transfer for each
+	for _, text := range chunks {
+		tx := prepareTransfer(text)
+		txs = append(txs, tx...)
+	}
+
+	tip := prepareTip()
+	endTx := append(txs, tip)
+
+	params := prepareParams(
+		endTx,
 	)
+
+	result, err := sendTransfer(params)
+
+	if err != nil {
+		return result, err
+	}
+	// Send the transfers
+	return result, nil
 }
 
 func prepareTransfer(text string) []rpc.Transfer {
-	payload = rpc.Arguments{
+	payload := rpc.Arguments{
 		{
 			Name:     rpc.RPC_DESTINATION_PORT,
 			DataType: rpc.DataUint64,
@@ -319,8 +331,8 @@ func prepareTransfer(text string) []rpc.Transfer {
 		},
 	}
 
-	transfer = rpc.Transfer{
-		Destination: DEVELOPER_ADDRESS,
+	transfer := rpc.Transfer{
+		Destination: destinationAddress,
 		Amount:      uint64(0),
 		Payload_RPC: payload,
 	}
@@ -328,30 +340,38 @@ func prepareTransfer(text string) []rpc.Transfer {
 	return []rpc.Transfer{transfer}
 }
 
-func prepareTransfers(chunks []string) []rpc.Transfer {
+func prepareTip() rpc.Transfer {
 
-	// Create a list to store transfers
-	var transfers []rpc.Transfer
-
-	// Iterate over the chunks and create a transfer for each
-	for _, text := range chunks {
-
-		transfer := prepareTransfer(text)
-
-		transfers = append(transfers, transfer...)
+	receipt := rpc.Arguments{
+		{
+			Name:     rpc.RPC_COMMENT,
+			DataType: rpc.DataString,
+			Value:    tipMsg,
+		},
 	}
-	return transfers
+
+	transfer := rpc.Transfer{
+		Destination: DEVELOPER_ADDRESS,
+		Amount:      tipAmt,
+		Payload_RPC: receipt,
+	}
+
+	return transfer
 }
 
-func prepareParams(transfer []rpc.Transfer) rpc.Transfer_Params {
-	transferParams = rpc.Transfer_Params{
-		Transfers: transfer,
+func prepareParams(transfers []rpc.Transfer) rpc.Transfer_Params {
+
+	transferParams := rpc.Transfer_Params{
+		Transfers: transfers,
 	}
+
 	return transferParams
+
 }
 
-func processSingleEntry(text string) rpc.Transfer_Result {
+func processSingleEntry(text string) (rpc.Transfer_Result, error) {
 	// Send the transfers
+
 	return sendTransfer(prepareParams(prepareTransfer(text)))
 }
 
@@ -440,6 +460,10 @@ func showSettingsWindow(
 	modal.Show()
 }
 
+func validateAddress(a string) bool {
+	return len(a) == 66
+}
+
 func processEntrySubmission(
 	entry *widget.Entry,
 	entryButton *widget.Button,
@@ -454,7 +478,16 @@ func processEntrySubmission(
 
 	entry.Disable()
 
-	result := processEntry(entry.Text)
+	result, err := processEntry(entry.Text)
+	if err != nil {
+		resultLabel.SetText(
+			fmt.Sprintf(
+				"Status: Error",
+				truncateTXID(result.TXID, 4, 4),
+			),
+		)
+		resetEntryAfterSubmission(entry, entryButton, resultLabel, contentContainer)
+	}
 	resultLabel.SetText(
 		fmt.Sprintf(
 			"Status: Processing %s",

@@ -23,4 +23,5 @@ const (
 	DEVELOPER_ADDRESS = "dero1qyvqpdftj8r6005xs20rnflakmwa5pdxg9vcjzdcuywq2t8skqhvwqglt6x0g"
 	DEFAULT_WAIT_TIME = 256
 	PAGINATION        = 20
+	CHUNKSIZE         = 80
 )
