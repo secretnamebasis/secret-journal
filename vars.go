@@ -36,7 +36,7 @@ var (
 	session appSession
 	ui      appUI
 
-	version        = semver.MustParse("0.0.1")
+	version        = semver.MustParse("0.0.2")
 	versionMsg     = "secret-journal | version: %s \n"
 	copyrightMsg   = "Copyright 2024 secretnamebasis. All rights reserved."
 	osArchGoMaxMsg = "OS: %s ARCH: %s GOMAXPROCS: %d\n\n"
@@ -54,7 +54,6 @@ var (
 	// dero
 	deroUsername   string
 	deroPassword   string
-	deroAddress    = DEVELOPER_ADDRESS
 	deroIp         = "127.0.0.1"
 	deroPort       = "10103"
 	deroEndpoint   = "http://" + deroIp + ":" + deroPort + "/json_rpc"

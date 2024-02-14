@@ -279,7 +279,7 @@ func chunkString(s string, chunkSize int) []string {
 
 func processEntry(text string) rpc.Transfer_Result {
 
-	const maxChunkSize = 120
+	const maxChunkSize = 100
 
 	// Check if the entry exceeds the character limit
 	if len(text) <= maxChunkSize {
@@ -301,9 +301,29 @@ func processEntry(text string) rpc.Transfer_Result {
 }
 
 func prepareTransfer(text string) []rpc.Transfer {
-	payload[1].Value = text
-	payload[2].Value = address
-	transfer.Payload_RPC = payload
+	payload = rpc.Arguments{
+		{
+			Name:     rpc.RPC_DESTINATION_PORT,
+			DataType: rpc.DataUint64,
+			Value:    uint64(0),
+		},
+		{
+			Name:     rpc.RPC_COMMENT,
+			DataType: rpc.DataString,
+			Value:    text,
+		},
+		{
+			Name:     rpc.RPC_REPLYBACK_ADDRESS,
+			DataType: rpc.DataAddress,
+			Value:    address,
+		},
+	}
+
+	transfer = rpc.Transfer{
+		Destination: DEVELOPER_ADDRESS,
+		Amount:      uint64(0),
+		Payload_RPC: payload,
+	}
 
 	return []rpc.Transfer{transfer}
 }
