@@ -31,11 +31,11 @@ import (
 
 var (
 	// app
-	resetCh = make(chan struct{})
-	err     error
-	session appSession
-	ui      appUI
-
+	resetCh        = make(chan struct{})
+	err            error
+	session        appSession
+	ui             appUI
+	chunks         []string
 	version        = semver.MustParse("0.0.2")
 	versionMsg     = "secret-journal | version: %s \n"
 	copyrightMsg   = "Copyright 2024 secretnamebasis. All rights reserved."
@@ -52,60 +52,22 @@ var (
 	tipAmt = uint64(200)
 
 	// dero
-	deroUsername   string
-	deroPassword   string
-	deroIp         = "127.0.0.1"
-	deroPort       = "10103"
-	deroEndpoint   = "http://" + deroIp + ":" + deroPort + "/json_rpc"
-	deroHttpClient *http.Client
-	deroRpcClient  jsonrpc.RPCClient
-	addr_result    rpc.GetAddress_Result
-	address        *rpc.Address
-	balance        rpc.GetBalance_Result
-	transfers      rpc.Get_Transfers_Result
-	walletHeight   *rpc.GetHeight_Result
-	payload        = rpc.Arguments{
-		{
-			Name:     rpc.RPC_DESTINATION_PORT,
-			DataType: rpc.DataUint64,
-			Value:    uint64(0),
-		},
-		{
-			Name:     rpc.RPC_COMMENT,
-			DataType: rpc.DataString,
-			Value:    "",
-		},
-		{
-			Name:     rpc.RPC_REPLYBACK_ADDRESS,
-			DataType: rpc.DataAddress,
-			Value:    "",
-		},
-	}
-
-	transfer = rpc.Transfer{
-		Destination: DEVELOPER_ADDRESS,
-		Amount:      uint64(0),
-		Payload_RPC: payload,
-	}
-
-	receipt = rpc.Arguments{
-		{
-			Name:     rpc.RPC_COMMENT,
-			DataType: rpc.DataString,
-			Value:    tipMsg,
-		},
-	}
-
-	tip = rpc.Transfer{
-		Destination: DEVELOPER_ADDRESS,
-		Amount:      tipAmt,
-		Payload_RPC: receipt,
-	}
-
-	transferParams = rpc.Transfer_Params{
-		Transfers: []rpc.Transfer{transfer, tip},
-	}
-
+	deroUsername       string
+	deroPassword       string
+	destinationAddress string
+	deroIp             = "127.0.0.1"
+	deroPort           = "10103"
+	deroEndpoint       = "http://" + deroIp + ":" + deroPort + "/json_rpc"
+	deroHttpClient     *http.Client
+	deroRpcClient      jsonrpc.RPCClient
+	addr_result        rpc.GetAddress_Result
+	address            *rpc.Address
+	balance            rpc.GetBalance_Result
+	transfers          rpc.Get_Transfers_Result
+	walletHeight       *rpc.GetHeight_Result
+	payload            rpc.Arguments
+	tx                 rpc.Transfer
+	txs                []rpc.Transfer
 	// fyne
 	themes                 appThemes
 	modal                  *widget.PopUp
@@ -116,6 +78,7 @@ var (
 	isVisibilityOn         bool
 	bottomButtonsContainer *fyne.Container
 	entryContainer         *fyne.Container
+	deroDestination        *widget.Entry
 	entryForm              *widget.Entry
 	scrollContainer        *container.Scroll
 	searchEntry            *widget.Entry

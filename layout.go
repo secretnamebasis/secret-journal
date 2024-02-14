@@ -1,6 +1,8 @@
 package main
 
 import (
+	"errors"
+
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
@@ -18,6 +20,8 @@ func layoutMain() fyne.CanvasObject {
 	entryForm.Wrapping = fyne.TextWrapWord
 	entryForm.SetMinRowsVisible(1)
 	entryForm.PlaceHolder = "Enter Text Here..."
+	deroDestination := widget.NewEntry()
+	deroDestination.PlaceHolder = "dero1q...0g"
 
 	resultLabel := widget.NewLabel("Status: New")
 	searchEntry = widget.NewEntry()
@@ -66,13 +70,27 @@ func layoutMain() fyne.CanvasObject {
 		},
 	)
 	refreshButton.Disable()
+	deroDestination.Validator = func(s string) (err error) {
+		switch {
+		case deroDestination.Text == "":
+			resultLabel.SetText("Enter receiving address")
+		case !validateAddress(deroDestination.Text):
+			resultLabel.SetText("Please correct Address")
+			err := errors.New("address error")
+			return err
+		case validateAddress(deroDestination.Text):
+			resultLabel.SetText(":)")
+			destinationAddress = deroDestination.Text
+			deroDestination.SetText(truncateAddress(deroDestination.Text, 6, 2))
+		}
 
+		return nil
+	}
 	entryButton = widget.NewButtonWithIcon(
 		"",
 		theme.MailSendIcon(),
 		func() {
 			pause()
-
 			processEntrySubmission(
 				entryForm,
 				entryButton,
@@ -126,7 +144,7 @@ func layoutMain() fyne.CanvasObject {
 	)
 
 	entryContainer := container.NewGridWrap(
-		fyne.NewSize(ui.width*0.9, ui.maxheight*.065),
+		fyne.NewSize(ui.width*0.92, ui.maxheight*.065),
 		entryForm,
 	)
 
@@ -137,6 +155,7 @@ func layoutMain() fyne.CanvasObject {
 
 	chatBarContainer := container.NewVBox(
 		resultLabel,
+		deroDestination,
 		buttonsContainer,
 	)
 
