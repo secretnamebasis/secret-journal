@@ -31,7 +31,7 @@
 
 Grab the latest [release](https://github.com/secretnamebasis/secret-journal/releases/latest/).
 
-> [android](https://github.com/secretnamebasis/secret-journal/releases/latest/secret-journal.apk) & [linux](https://github.com/secretnamebasis/secret-journal/releases/latest/secret-journal.tar.xz) 
+> [android](https://github.com/secretnamebasis/secret-journal/releases/latest/secret_journal.apk) & [linux](https://github.com/secretnamebasis/secret-journal/releases/latest/secret-journal.tar.xz) 
 
 
 ### From Source
