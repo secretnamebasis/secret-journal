@@ -154,26 +154,6 @@ func sendTransfer(params rpc.Transfer_Params) (rpc.Transfer_Result, error) {
 	return transfers, nil
 }
 
-func getIncomingTransfers() (rpc.Get_Transfers_Result, error) {
-
-	err = deroRpcClient.CallFor(
-		&transfers,
-		"GetTransfers",
-		rpc.Get_Transfers_Params{
-			In:              true,
-			Out:             false,
-			Coinbase:        false,
-			DestinationPort: uint64(0),
-		},
-	)
-	if err != nil {
-		log.Errorf("Could not obtain gettransfers from wallet: %v", err)
-		return transfers, err
-	}
-
-	return transfers, nil
-}
-
 func getOutgoingTransfers() (rpc.Get_Transfers_Result, error) {
 
 	err = deroRpcClient.CallFor(
@@ -184,7 +164,6 @@ func getOutgoingTransfers() (rpc.Get_Transfers_Result, error) {
 			Out:             true,
 			Coinbase:        false,
 			DestinationPort: uint64(0),
-			Receiver:        DEVELOPER_ADDRESS,
 		},
 	)
 	if err != nil {
@@ -482,7 +461,7 @@ func processEntrySubmission(
 	if err != nil {
 		resultLabel.SetText(
 			fmt.Sprintf(
-				"Status: Error",
+				"Status: Error %s",
 				truncateTXID(result.TXID, 4, 4),
 			),
 		)

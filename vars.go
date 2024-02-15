@@ -36,7 +36,7 @@ var (
 	session        appSession
 	ui             appUI
 	chunks         []string
-	version        = semver.MustParse("0.0.3")
+	version        = semver.MustParse("0.0.4")
 	versionMsg     = "secret-journal | version: %s \n"
 	copyrightMsg   = "Copyright 2024 secretnamebasis. All rights reserved."
 	osArchGoMaxMsg = "OS: %s ARCH: %s GOMAXPROCS: %d\n\n"

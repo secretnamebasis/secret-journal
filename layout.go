@@ -81,7 +81,6 @@ func layoutMain() fyne.CanvasObject {
 		case validateAddress(deroDestination.Text):
 			resultLabel.SetText(":)")
 			destinationAddress = deroDestination.Text
-			deroDestination.SetText(truncateAddress(deroDestination.Text, 6, 2))
 		}
 
 		return nil
