@@ -385,7 +385,7 @@ func prepareTransfer(text string) []rpc.Transfer {
 
 	transfer := rpc.Transfer{
 		Destination: destinationAddress,
-		Amount:      uint64(1),
+		Amount:      uint64(0),
 		Payload_RPC: payload,
 	}
 
@@ -653,12 +653,12 @@ func displayTransfers(
 
 	contentContainer.Objects = nil
 
-	transfersMap, authorsMap := organizeTransfersByTime(entriesData)
+	transfersMap := organizeTransfersByTime(entriesData)
 
 	sortedTimes := sortTimestamps(transfersMap)
 
 	// Display the first page of entries
-	displayPage(contentContainer, transfersMap, authorsMap, sortedTimes, 0)
+	displayPage(contentContainer, transfersMap, sortedTimes, 0)
 
 	contentContainer.Refresh()
 
@@ -666,7 +666,7 @@ func displayTransfers(
 
 func displayPage(
 	contentContainer *fyne.Container,
-	transfersMap, authorsMap map[string]string,
+	transfersMap map[string]string,
 	sortedTimes []string,
 	pageIndex int,
 ) {
@@ -701,7 +701,6 @@ func displayPage(
 		len(sortedTimes)-startIndex-1,
 		sortedTimes,
 		transfersMap,
-		authorsMap,
 		contentContainer,
 	)
 	contentContainer.Objects = append([]fyne.CanvasObject{loadMoreContainer}, contentContainer.Objects...)
@@ -715,7 +714,6 @@ func displayPage(
 			displayPage(
 				contentContainer,
 				transfersMap,
-				authorsMap,
 				sortedTimes,
 				pageIndex+1,
 			)
@@ -732,53 +730,35 @@ func displayPage(
 	}
 }
 
-func organizeTransfersByTime(entriesData []rpc.Entry) (map[string]string, map[string]string) {
+func organizeTransfersByTime(entriesData []rpc.Entry) map[string]string {
 	transfersMap := make(map[string]string)
-	authorsMap := make(map[string]string)
 
-	if destinationAddress != "" {
-		for _, e := range entriesData {
+	for _, e := range entriesData {
+
+		if e.Amount == 0 &&
+			e.Payload_RPC.Has(
+				rpc.RPC_COMMENT,
+				rpc.DataString,
+			) &&
+			e.Payload_RPC.Has(
+				rpc.RPC_REPLYBACK_ADDRESS,
+				rpc.DataAddress,
+			) {
+
 			timeStr := e.Time.Format("2006-01-02 15:04:05")
-			var userStr string
-			if e.Amount > 0 {
-				if e.Payload_RPC.Has(rpc.RPC_COMMENT, rpc.DataString) && e.Payload_RPC.Value(rpc.RPC_COMMENT, rpc.DataString).(string) != "" {
-					if e.Payload_RPC.Has(rpc.RPC_REPLYBACK_ADDRESS, rpc.DataAddress) {
-						if e.Incoming {
-							fmt.Printf("dest addr: %s\n", destinationAddress)
-							if e.Payload_RPC.Value(rpc.RPC_REPLYBACK_ADDRESS, rpc.DataAddress).(rpc.Address).String() != destinationAddress {
-								continue
-							}
-							userStr = e.Payload_RPC.Value(rpc.RPC_REPLYBACK_ADDRESS, rpc.DataAddress).(rpc.Address).String()
-						} else {
-							if e.Destination != destinationAddress {
-								continue
-							}
-							userStr = e.Sender
-						}
-						if _, ok := authorsMap[timeStr]; !ok {
-							authorsMap[timeStr] = ""
-						}
 
-						// Check if userStr is not already in authorsMap
-						if !strings.Contains(authorsMap[timeStr], userStr) {
-							authorsMap[timeStr] += userStr
-						}
-
-						if _, ok := transfersMap[timeStr]; !ok {
-							transfersMap[timeStr] = ""
-						}
-
-						transfersMap[timeStr] += e.Payload_RPC.Value(
-							rpc.RPC_COMMENT,
-							rpc.DataString,
-						).(string)
-					}
-				}
+			if _, ok := transfersMap[timeStr]; !ok {
+				transfersMap[timeStr] = ""
 			}
+
+			transfersMap[timeStr] += e.Payload_RPC.Value(
+				rpc.RPC_COMMENT,
+				rpc.DataString,
+			).(string)
 		}
-		return transfersMap, authorsMap
 	}
-	return nil, nil
+
+	return transfersMap
 }
 
 func sortTimestamps(transfersMap map[string]string) []string {
@@ -796,7 +776,7 @@ func sortTimestamps(transfersMap map[string]string) []string {
 func createWidgetsAndAddToContainer(
 	startIndex, endIndex int,
 	sortedTimes []string,
-	transfersMap, authorsMap map[string]string,
+	transfersMap map[string]string,
 	contentContainer *fyne.Container,
 ) []*entryInfo {
 	var entryInfos []*entryInfo
@@ -804,19 +784,9 @@ func createWidgetsAndAddToContainer(
 	for i := endIndex; i >= startIndex && i < len(sortedTimes); i-- {
 		timeStr := sortedTimes[i]
 		text := transfersMap[timeStr]
-		author := authorsMap[timeStr]
-		truncatedAuthor := truncateAddress(author, 6, 7)
+
 		timeLabel := widget.NewLabelWithStyle(
 			timeStr,
-			fyne.TextAlignLeading,
-			fyne.TextStyle{
-				Bold:      false,
-				Italic:    true,
-				Monospace: false,
-			},
-		)
-		authorLabel := widget.NewLabelWithStyle(
-			truncatedAuthor,
 			fyne.TextAlignLeading,
 			fyne.TextStyle{
 				Bold:      false,
@@ -830,7 +800,6 @@ func createWidgetsAndAddToContainer(
 
 		entryContainer = container.NewVBox(
 			container.NewHBox(
-				authorLabel,
 				timeLabel,
 			),
 			textLabel,
@@ -843,8 +812,6 @@ func createWidgetsAndAddToContainer(
 			Index:          i,
 			TimeStr:        timeStr,
 			Text:           text,
-			Author:         author,
-			AuthorLabel:    authorLabel,
 			TimeLabel:      timeLabel,
 			TextLabel:      textLabel,
 			EntryContainer: entryContainer,
@@ -868,15 +835,10 @@ func getOutgoingData() []rpc.Entry {
 func updateTransfers(contentContainer *fyne.Container) {
 	// Combine outgoing and incoming entries
 
-	data, err := getAllTransfers()
-
-	if err != nil {
-		// Handle the error appropriately, e.g., log it or display a message
-		panic(err)
-	}
+	data := getOutgoingData()
 
 	// Display the combined entries in the content container
-	displayTransfers(data.Entries, contentContainer)
+	displayTransfers(data, contentContainer)
 
 	// Scroll to the bottom of the content container
 	scrollContainer.ScrollToBottom()
