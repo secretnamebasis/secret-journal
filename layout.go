@@ -1,17 +1,17 @@
 package main
 
 import (
-	"errors"
-
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	x "fyne.io/x/fyne/widget"
 )
 
 func layoutMain() fyne.CanvasObject {
 	session.window.SetFixedSize(false)
-
+	options := []string{}
+	deroDestination = x.NewCompletionEntry(options)
 	contentContainer.Hide()
 	scrollContainer = container.NewVScroll(contentContainer)
 	scrollContainer.SetMinSize(fyne.NewSize(ui.maxwidth, ui.maxheight))
@@ -20,10 +20,8 @@ func layoutMain() fyne.CanvasObject {
 	entryForm.Wrapping = fyne.TextWrapWord
 	entryForm.SetMinRowsVisible(1)
 	entryForm.PlaceHolder = "Enter Text Here..."
-	deroDestination := widget.NewEntry()
-	deroDestination.PlaceHolder = "dero1q...0g"
 
-	resultLabel := widget.NewLabel("Status: New")
+	resultLabel = widget.NewLabel("Status: Not Logged In")
 	searchEntry = widget.NewEntry()
 	searchEntry.SetPlaceHolder("Search...")
 	searchEntry.OnSubmitted = func(query string) {
@@ -64,28 +62,34 @@ func layoutMain() fyne.CanvasObject {
 		theme.ViewRefreshIcon(),
 		func() {
 			pause()
-			updateTransfers(contentContainer)
+			switch {
+			case deroDestination.Text == "":
+				resultLabel.SetText("Enter receiving address")
+			case validateAddress(deroDestination.Text):
+				resultLabel.SetText(":)")
+				destinationAddress = deroDestination.Text
+				updateTransfers(contentContainer)
+			case deroDestination.Text != "":
+
+				truncatedText := deroDestination.Text
+				if original, ok := originalToTruncated[truncatedText]; ok {
+					// Original value found
+					resultLabel.SetText(":)")
+					destinationAddress = original
+
+					updateTransfers(contentContainer)
+				} else {
+					// Truncated value not found
+					resultLabel.SetText(":(")
+				}
+
+			}
 			scrollContainer.Refresh()
 
 		},
 	)
 	refreshButton.Disable()
-	deroDestination.Validator = func(s string) (err error) {
-		switch {
-		case deroDestination.Text == "":
-			resultLabel.SetText("Enter receiving address")
-		case !validateAddress(deroDestination.Text):
-			resultLabel.SetText("Please correct Address")
-			err := errors.New("address error")
-			return err
-		case validateAddress(deroDestination.Text):
-			resultLabel.SetText(":)")
-			destinationAddress = deroDestination.Text
-			deroDestination.SetText(truncateAddress(deroDestination.Text, 6, 2))
-		}
 
-		return nil
-	}
 	entryButton = widget.NewButtonWithIcon(
 		"",
 		theme.MailSendIcon(),
@@ -122,6 +126,40 @@ func layoutMain() fyne.CanvasObject {
 
 		},
 	)
+	deroDestination.PlaceHolder = truncateAddress(DEVELOPER_ADDRESS, 6, 7)
+	// When the use typed text, complete the list.
+	deroDestination.OnChanged = func(s string) {
+		// Completion starts for text length >= 3
+		if len(s) < 3 {
+			deroDestination.HideCompletion()
+			return
+		}
+
+		// Filter options that contain the typed text
+		filteredOptions := filterOptions(originalToTruncated, deroDestination.Text)
+
+		// No matching results
+		if len(filteredOptions) == 0 {
+			deroDestination.HideCompletion()
+			return
+		}
+
+		// Show filtered options
+		deroDestination.SetOptions(filteredOptions)
+		deroDestination.ShowCompletion()
+		updateTransfers(contentContainer)
+	}
+	contactButton := widget.NewButtonWithIcon(
+		"",
+		theme.AccountIcon(),
+		func() {
+			showContactWindow(
+				session.window,
+			)
+
+		},
+	)
+	deroDestination.Disable()
 
 	toolbarContainer := container.NewBorder(
 		container.NewVBox(
@@ -149,13 +187,15 @@ func layoutMain() fyne.CanvasObject {
 	)
 
 	buttonsContainer := container.NewHBox(
+		contactButton,
 		entryContainer,
 		buttonContainer,
 	)
 
 	chatBarContainer := container.NewVBox(
+
 		resultLabel,
-		deroDestination,
+
 		buttonsContainer,
 	)
 

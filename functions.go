@@ -32,6 +32,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	x "fyne.io/x/fyne/widget"
 	"github.com/deroproject/derohe/rpc"
 	"github.com/google/martian/log"
 
@@ -154,6 +155,26 @@ func sendTransfer(params rpc.Transfer_Params) (rpc.Transfer_Result, error) {
 	return transfers, nil
 }
 
+func getAllTransfers() (rpc.Get_Transfers_Result, error) {
+
+	err = deroRpcClient.CallFor(
+		&transfers,
+		"GetTransfers",
+		rpc.Get_Transfers_Params{
+			In:              true,
+			Out:             true,
+			Coinbase:        false,
+			DestinationPort: uint64(0),
+		},
+	)
+	if err != nil {
+		log.Errorf("Could not obtain gettransfers from wallet: %v", err)
+		return transfers, err
+	}
+
+	return transfers, nil
+}
+
 func getIncomingTransfers() (rpc.Get_Transfers_Result, error) {
 
 	err = deroRpcClient.CallFor(
@@ -184,7 +205,7 @@ func getOutgoingTransfers() (rpc.Get_Transfers_Result, error) {
 			Out:             true,
 			Coinbase:        false,
 			DestinationPort: uint64(0),
-			Receiver:        DEVELOPER_ADDRESS,
+			// Receiver:        destinationAddress,
 		},
 	)
 	if err != nil {
@@ -209,8 +230,38 @@ func truncateTXID(txid string, prefixLen, suffixLen int) string {
 	return fmt.Sprintf("%s....%s", txid[:prefixLen], txid[len(txid)-suffixLen:])
 }
 
+func updateContacts(deroDestination *x.CompletionEntry, resultLabel *widget.Label) {
+	var truncatedOptions []string
+
+	data, _ := getOutgoingTransfers()
+
+	for _, e := range data.Entries {
+		option := e.Destination
+
+		// Check if the option is not already in the map
+		if !uniqueOptions[option] {
+			uniqueOptions[option] = true
+
+			// Truncate the option
+			truncatedOption := truncateAddress(option, 4, 4)
+
+			// Check if the truncated option is not already in the map
+			if !uniqueOptions[truncatedOption] {
+				uniqueOptions[truncatedOption] = true
+				truncatedOptions = append(truncatedOptions, truncatedOption)
+
+				// Map the original option to its truncated version
+				originalToTruncated[truncatedOption] = option
+			}
+		}
+	}
+	deroDestination.SetOptions(truncatedOptions)
+}
+
 func connectWallet() {
 	go func() {
+		updateContacts(deroDestination, resultLabel)
+
 		updateWallet(lblAddress)
 		updateHeight(lblHeight)
 		updateBalance(lblBalance)
@@ -228,6 +279,7 @@ func connectWallet() {
 				// Add any other periodic tasks here
 
 			case <-resetCh:
+				ticker.Stop()
 				return
 			}
 		}
@@ -333,7 +385,7 @@ func prepareTransfer(text string) []rpc.Transfer {
 
 	transfer := rpc.Transfer{
 		Destination: destinationAddress,
-		Amount:      uint64(0),
+		Amount:      uint64(1),
 		Payload_RPC: payload,
 	}
 
@@ -373,6 +425,73 @@ func processSingleEntry(text string) (rpc.Transfer_Result, error) {
 	// Send the transfers
 
 	return sendTransfer(prepareParams(prepareTransfer(text)))
+}
+
+func showContactWindow(
+	w fyne.Window,
+) {
+
+	deroDestination.Validator = func(s string) (err error) {
+
+		switch {
+		case deroDestination.Text == "":
+			resultLabel.SetText("Enter receiving address")
+		case validateAddress(deroDestination.Text):
+			resultLabel.SetText(":)")
+			destinationAddress = deroDestination.Text
+		case deroDestination.Text != "":
+
+			truncatedText := deroDestination.Text
+			if original, ok := originalToTruncated[truncatedText]; ok {
+				// Original value found
+				resultLabel.SetText(":)")
+				destinationAddress = original
+
+			} else {
+				// Truncated value not found
+				resultLabel.SetText(":(")
+			}
+
+		}
+
+		return nil
+	}
+
+	lbl := widget.NewLabel("Choose Contact")
+
+	formWidget := container.NewGridWrap(
+		fyne.NewSize(ui.width, 45),
+		deroDestination,
+	)
+
+	closeButton := widget.NewButton(
+		"Close",
+		func() {
+			if modal != nil {
+				modal.Hide()
+			}
+		})
+
+	closeButton.OnTapped = func() {
+		if modal != nil {
+			modal.Hide()
+		}
+	}
+
+	modalContent := container.NewCenter(
+		container.NewVBox(
+			lbl,
+			container.NewCenter(
+				container.NewHBox(
+					formWidget,
+					closeButton,
+				),
+			),
+		),
+	)
+	modal = widget.NewModalPopUp(modalContent, w.Canvas())
+
+	modal.Show()
 }
 
 func showSettingsWindow(
@@ -417,6 +536,7 @@ func showSettingsWindow(
 			visbilityButton.Enable()
 			logoutButton.Enable()
 			refreshButton.Enable()
+			deroDestination.Enable()
 
 		},
 	)
@@ -533,12 +653,12 @@ func displayTransfers(
 
 	contentContainer.Objects = nil
 
-	transfersMap := organizeTransfersByTime(entriesData)
+	transfersMap, authorsMap := organizeTransfersByTime(entriesData)
 
 	sortedTimes := sortTimestamps(transfersMap)
 
 	// Display the first page of entries
-	displayPage(contentContainer, transfersMap, sortedTimes, 0)
+	displayPage(contentContainer, transfersMap, authorsMap, sortedTimes, 0)
 
 	contentContainer.Refresh()
 
@@ -546,7 +666,7 @@ func displayTransfers(
 
 func displayPage(
 	contentContainer *fyne.Container,
-	transfersMap map[string]string,
+	transfersMap, authorsMap map[string]string,
 	sortedTimes []string,
 	pageIndex int,
 ) {
@@ -581,6 +701,7 @@ func displayPage(
 		len(sortedTimes)-startIndex-1,
 		sortedTimes,
 		transfersMap,
+		authorsMap,
 		contentContainer,
 	)
 	contentContainer.Objects = append([]fyne.CanvasObject{loadMoreContainer}, contentContainer.Objects...)
@@ -594,6 +715,7 @@ func displayPage(
 			displayPage(
 				contentContainer,
 				transfersMap,
+				authorsMap,
 				sortedTimes,
 				pageIndex+1,
 			)
@@ -610,35 +732,53 @@ func displayPage(
 	}
 }
 
-func organizeTransfersByTime(entriesData []rpc.Entry) map[string]string {
+func organizeTransfersByTime(entriesData []rpc.Entry) (map[string]string, map[string]string) {
 	transfersMap := make(map[string]string)
+	authorsMap := make(map[string]string)
 
-	for _, e := range entriesData {
-
-		if e.Amount == 0 &&
-			e.Payload_RPC.Has(
-				rpc.RPC_COMMENT,
-				rpc.DataString,
-			) &&
-			e.Payload_RPC.Has(
-				rpc.RPC_REPLYBACK_ADDRESS,
-				rpc.DataAddress,
-			) {
-
+	if destinationAddress != "" {
+		for _, e := range entriesData {
 			timeStr := e.Time.Format("2006-01-02 15:04:05")
+			var userStr string
+			if e.Amount > 0 {
+				if e.Payload_RPC.Has(rpc.RPC_COMMENT, rpc.DataString) && e.Payload_RPC.Value(rpc.RPC_COMMENT, rpc.DataString).(string) != "" {
+					if e.Payload_RPC.Has(rpc.RPC_REPLYBACK_ADDRESS, rpc.DataAddress) {
+						if e.Incoming {
+							fmt.Printf("dest addr: %s\n", destinationAddress)
+							if e.Payload_RPC.Value(rpc.RPC_REPLYBACK_ADDRESS, rpc.DataAddress).(rpc.Address).String() != destinationAddress {
+								continue
+							}
+							userStr = e.Payload_RPC.Value(rpc.RPC_REPLYBACK_ADDRESS, rpc.DataAddress).(rpc.Address).String()
+						} else {
+							if e.Destination != destinationAddress {
+								continue
+							}
+							userStr = e.Sender
+						}
+						if _, ok := authorsMap[timeStr]; !ok {
+							authorsMap[timeStr] = ""
+						}
 
-			if _, ok := transfersMap[timeStr]; !ok {
-				transfersMap[timeStr] = ""
+						// Check if userStr is not already in authorsMap
+						if !strings.Contains(authorsMap[timeStr], userStr) {
+							authorsMap[timeStr] += userStr
+						}
+
+						if _, ok := transfersMap[timeStr]; !ok {
+							transfersMap[timeStr] = ""
+						}
+
+						transfersMap[timeStr] += e.Payload_RPC.Value(
+							rpc.RPC_COMMENT,
+							rpc.DataString,
+						).(string)
+					}
+				}
 			}
-
-			transfersMap[timeStr] += e.Payload_RPC.Value(
-				rpc.RPC_COMMENT,
-				rpc.DataString,
-			).(string)
 		}
+		return transfersMap, authorsMap
 	}
-
-	return transfersMap
+	return nil, nil
 }
 
 func sortTimestamps(transfersMap map[string]string) []string {
@@ -656,7 +796,7 @@ func sortTimestamps(transfersMap map[string]string) []string {
 func createWidgetsAndAddToContainer(
 	startIndex, endIndex int,
 	sortedTimes []string,
-	transfersMap map[string]string,
+	transfersMap, authorsMap map[string]string,
 	contentContainer *fyne.Container,
 ) []*entryInfo {
 	var entryInfos []*entryInfo
@@ -664,8 +804,19 @@ func createWidgetsAndAddToContainer(
 	for i := endIndex; i >= startIndex && i < len(sortedTimes); i-- {
 		timeStr := sortedTimes[i]
 		text := transfersMap[timeStr]
+		author := authorsMap[timeStr]
+		truncatedAuthor := truncateAddress(author, 6, 7)
 		timeLabel := widget.NewLabelWithStyle(
 			timeStr,
+			fyne.TextAlignLeading,
+			fyne.TextStyle{
+				Bold:      false,
+				Italic:    true,
+				Monospace: false,
+			},
+		)
+		authorLabel := widget.NewLabelWithStyle(
+			truncatedAuthor,
 			fyne.TextAlignLeading,
 			fyne.TextStyle{
 				Bold:      false,
@@ -678,7 +829,10 @@ func createWidgetsAndAddToContainer(
 		textLabel.Wrapping = fyne.TextWrapWord
 
 		entryContainer = container.NewVBox(
-			timeLabel,
+			container.NewHBox(
+				authorLabel,
+				timeLabel,
+			),
 			textLabel,
 		)
 
@@ -689,6 +843,8 @@ func createWidgetsAndAddToContainer(
 			Index:          i,
 			TimeStr:        timeStr,
 			Text:           text,
+			Author:         author,
+			AuthorLabel:    authorLabel,
 			TimeLabel:      timeLabel,
 			TextLabel:      textLabel,
 			EntryContainer: entryContainer,
@@ -699,7 +855,7 @@ func createWidgetsAndAddToContainer(
 	return entryInfos
 }
 
-func getZeroAmountData() []rpc.Entry {
+func getOutgoingData() []rpc.Entry {
 	data, err := getOutgoingTransfers()
 	if err != nil {
 		fmt.Println("Error fetching outgoing transfers:", err)
@@ -709,9 +865,20 @@ func getZeroAmountData() []rpc.Entry {
 	return data.Entries
 }
 
-// Usage example:
 func updateTransfers(contentContainer *fyne.Container) {
-	displayTransfers(getZeroAmountData(), contentContainer)
+	// Combine outgoing and incoming entries
+
+	data, err := getAllTransfers()
+
+	if err != nil {
+		// Handle the error appropriately, e.g., log it or display a message
+		panic(err)
+	}
+
+	// Display the combined entries in the content container
+	displayTransfers(data.Entries, contentContainer)
+
+	// Scroll to the bottom of the content container
 	scrollContainer.ScrollToBottom()
 }
 
@@ -748,7 +915,7 @@ func searchTransfers(query string, contentContainer *fyne.Container) {
 
 	// Filter entries based on conditions
 	filteredEntries := filterEntriesByCondition(
-		getZeroAmountData(),
+		getOutgoingData(),
 		func(e rpc.Entry) bool {
 			return hasCommentPayload(e) && containsQueryIgnoreCase(getCommentPayloadValue(e), query)
 		})
@@ -814,4 +981,14 @@ func (theme1) Size(s fyne.ThemeSizeName) float32 {
 	default:
 		return theme.DefaultTheme().Size(s)
 	}
+}
+
+func filterOptions(originalToTruncated map[string]string, text string) []string {
+	var filteredOptions []string
+	for truncatedOption, _ := range originalToTruncated {
+		if strings.Contains(strings.ToLower(truncatedOption), strings.ToLower(text)) {
+			filteredOptions = append(filteredOptions, truncatedOption)
+		}
+	}
+	return filteredOptions
 }

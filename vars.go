@@ -24,6 +24,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/widget"
+	x "fyne.io/x/fyne/widget"
 	"github.com/blang/semver/v4"
 	"github.com/deroproject/derohe/rpc"
 	"github.com/ybbus/jsonrpc"
@@ -31,10 +32,13 @@ import (
 
 var (
 	// app
-	resetCh        = make(chan struct{})
-	err            error
-	session        appSession
-	ui             appUI
+	resetCh       = make(chan struct{})
+	err           error
+	session       appSession
+	ui            appUI
+	uniqueOptions = make(map[string]bool)
+
+	options        []string
 	chunks         []string
 	version        = semver.MustParse("0.0.3")
 	versionMsg     = "secret-journal | version: %s \n"
@@ -75,16 +79,19 @@ var (
 	entryButton            *widget.Button
 	logoutButton           *widget.Button
 	refreshButton          *widget.Button
+	contactButton          *widget.Button
 	isVisibilityOn         bool
 	bottomButtonsContainer *fyne.Container
 	entryContainer         *fyne.Container
-	deroDestination        *widget.Entry
+	deroDestination        *x.CompletionEntry
 	entryForm              *widget.Entry
 	scrollContainer        *container.Scroll
 	searchEntry            *widget.Entry
+	resultLabel            *widget.Label
 	lblHeight              = widget.NewLabel("Height: N/A")
 	lblAddress             = widget.NewLabel("Wallet: N/A")
 	lblBalance             = widget.NewLabel("Balance: N/A")
 	contentContainer       = container.NewVBox()
 	padding                = layout.NewSpacer()
+	originalToTruncated    = make(map[string]string)
 )
