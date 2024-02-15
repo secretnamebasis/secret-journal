@@ -155,6 +155,7 @@ func sendTransfer(params rpc.Transfer_Params) (rpc.Transfer_Result, error) {
 	return transfers, nil
 }
 
+
 func getAllTransfers() (rpc.Get_Transfers_Result, error) {
 
 	err = deroRpcClient.CallFor(
@@ -195,6 +196,7 @@ func getIncomingTransfers() (rpc.Get_Transfers_Result, error) {
 	return transfers, nil
 }
 
+
 func getOutgoingTransfers() (rpc.Get_Transfers_Result, error) {
 
 	err = deroRpcClient.CallFor(
@@ -205,7 +207,9 @@ func getOutgoingTransfers() (rpc.Get_Transfers_Result, error) {
 			Out:             true,
 			Coinbase:        false,
 			DestinationPort: uint64(0),
+
 			// Receiver:        destinationAddress,
+
 		},
 	)
 	if err != nil {
@@ -602,7 +606,7 @@ func processEntrySubmission(
 	if err != nil {
 		resultLabel.SetText(
 			fmt.Sprintf(
-				"Status: Error",
+				"Status: Error %s",
 				truncateTXID(result.TXID, 4, 4),
 			),
 		)

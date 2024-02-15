@@ -90,6 +90,7 @@ func layoutMain() fyne.CanvasObject {
 	)
 	refreshButton.Disable()
 
+
 	entryButton = widget.NewButtonWithIcon(
 		"",
 		theme.MailSendIcon(),

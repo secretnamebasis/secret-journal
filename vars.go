@@ -40,7 +40,9 @@ var (
 
 	options        []string
 	chunks         []string
+
 	version        = semver.MustParse("0.0.5")
+
 	versionMsg     = "secret-journal | version: %s \n"
 	copyrightMsg   = "Copyright 2024 secretnamebasis. All rights reserved."
 	osArchGoMaxMsg = "OS: %s ARCH: %s GOMAXPROCS: %d\n\n"
