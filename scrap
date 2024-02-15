@@ -1,0 +1,7 @@
+dero-wallet-cli-linux-amd64 \
+        --wallet-file="wallet.db" \
+        --rpc-server \
+        --rpc-bind=127.0.0.1:10103 \
+        --unlocked \
+        --password=INSERT_WALLET_PASSWORD \
+        --rpc-login INSERT_DERO_USER:INSERT_DERO_USER_PASS 

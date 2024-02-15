@@ -56,6 +56,8 @@ type entryInfo struct {
 	Index          int
 	TimeStr        string
 	Text           string
+	Author         string
+	AuthorLabel    *widget.Label
 	TimeLabel      *widget.Label
 	TextLabel      *widget.RichText
 	IndexLabel     *widget.Label
