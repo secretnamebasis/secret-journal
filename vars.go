@@ -38,10 +38,10 @@ var (
 	ui            appUI
 	uniqueOptions = make(map[string]bool)
 
-	options        []string
-	chunks         []string
+	options []string
+	chunks  []string
 
-	version        = semver.MustParse("0.0.5")
+	version = semver.MustParse("0.0.6")
 
 	versionMsg     = "secret-journal | version: %s \n"
 	copyrightMsg   = "Copyright 2024 secretnamebasis. All rights reserved."
