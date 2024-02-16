@@ -9,7 +9,7 @@ import (
 )
 
 func layoutMain() fyne.CanvasObject {
-	session.window.SetFixedSize(false)
+	session.window.SetFixedSize(true)
 	options := []string{}
 	deroDestination = x.NewCompletionEntry(options)
 	contentContainer.Hide()
@@ -89,7 +89,6 @@ func layoutMain() fyne.CanvasObject {
 		},
 	)
 	refreshButton.Disable()
-
 
 	entryButton = widget.NewButtonWithIcon(
 		"",
@@ -178,12 +177,12 @@ func layoutMain() fyne.CanvasObject {
 		nil,
 	)
 	buttonContainer := container.NewGridWrap(
-		fyne.NewSize(ui.width*0.18, ui.maxheight*.065),
+		fyne.NewSize(ui.width*0.18, ui.maxheight*.1),
 		entryButton,
 	)
 
 	entryContainer := container.NewGridWrap(
-		fyne.NewSize(ui.width*0.92, ui.maxheight*.065),
+		fyne.NewSize(ui.width*0.92, ui.maxheight*.1),
 		entryForm,
 	)
 

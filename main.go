@@ -75,8 +75,8 @@ func main() {
 	// you are in the main part of the app
 	session.domain = appMain
 
-	ui.maxwidth = 360
-	ui.maxheight = 680
+	ui.maxwidth = 300
+	ui.maxheight = 450
 
 	ui.width = ui.maxwidth * 0.9
 	ui.height = ui.maxheight
